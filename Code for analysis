@@ -1,0 +1,82 @@
+// Define the region of interest (Pakistan boundary)
+var pakistan = ee.FeatureCollection('USDOS/LSIB_SIMPLE/2017')
+                .filter(ee.Filter.eq('country_na', 'Pakistan'));
+
+// Define the years of interest
+var startYear = 2010;
+var endYear = 2024;
+
+// Define monsoon months (June to September)
+var monsoonMonths = [6, 7, 8, 9];
+
+// Function to calculate and visualize monsoon rainfall for each year
+function getMonsoonRainfall(year) {
+  // Filter CHIRPS data for the given year and monsoon months
+  var rainfall = ee.ImageCollection('UCSB-CHG/CHIRPS/DAILY')
+                  .filter(ee.Filter.calendarRange(year, year, 'year'))
+                  .filter(ee.Filter.calendarRange(monsoonMonths[0], monsoonMonths[3], 'month'))
+                  .select('precipitation')
+                  .sum(); // Sum over the monsoon period
+
+  // Set visualization parameters for rainfall
+  var rainfallVis = {
+    min: 0,
+    max: 800, // Adjust max depending on observed rainfall range
+    palette: ['white', 'lightblue', 'blue', 'darkblue', 'purple']
+  };
+
+  // Add layer to the map for visualization
+  Map.addLayer(rainfall.clip(pakistan), rainfallVis, 'Monsoon Rainfall ' + year.toString());
+}
+
+// Loop over each year and calculate monsoon rainfall
+for (var year = startYear; year <= endYear; year++) {
+  getMonsoonRainfall(year);
+}
+
+// Center map on Pakistan
+Map.centerObject(pakistan, 6);
+
+// Add legend
+var legend = ui.Panel({
+  style: {
+    position: 'bottom-left',
+    padding: '8px 15px'
+  }
+});
+
+// Title for the legend
+var legendTitle = ui.Label({
+  value: 'Monsoon Rainfall (mm)',
+  style: {
+    fontWeight: 'bold',
+    fontSize: '16px',
+    margin: '0 0 4px 0',
+    padding: '0'
+  }
+});
+legend.add(legendTitle);
+
+// Define color bar for rainfall legend
+var makeColorBar = function(palette, min, max) {
+  return ui.Thumbnail({
+    image: ee.Image.pixelLonLat().select(0).multiply(0).add(min)
+      .visualize({min: min, max: max, palette: palette}),
+    params: {bbox: [0, 0, 1, 0.1], dimensions: '100x10'},
+    style: {stretch: 'horizontal', margin: '0px 8px'}
+  });
+};
+
+// Rainfall legend values and colors
+var palette = ['white', 'lightblue', 'blue', 'darkblue', 'purple'];
+var minVal = 0;
+var maxVal = 800;
+
+legend.add(makeColorBar(palette, minVal, maxVal));
+
+// Add labels for min and max values in the legend
+legend.add(ui.Label(minVal.toString(), {margin: '4px 8px'}));
+legend.add(ui.Label(maxVal.toString(), {margin: '4px 8px', textAlign: 'right'}));
+
+// Add the legend to the map
+Map.add(legend);
